@@ -14,6 +14,8 @@
     * 在 EPSG:4326 下直接 buffer(0.0449 度) -> 误差 1158.90 m
 """
 
+import math
+
 from qgis.core import (
     QgsCoordinateReferenceSystem,
     QgsCoordinateTransform,
@@ -56,8 +58,81 @@ def _ctx():
     return QgsProject.instance().transformContext()
 
 
+# ---- 缓存：QgsCoordinateTransform / QgsDistanceArea 构造很贵，拖动时每秒要用几十次 ----
+_TRANSFORMS = {}
+_MEASURERS = {}
+_GEOD = None
+
+
+def _crs_key(crs):
+    return crs.authid() or crs.toProj()
+
+
+def clear_cache():
+    """工程 CRS / 转换上下文变化时调用。"""
+    global _GEOD
+    _TRANSFORMS.clear()
+    _MEASURERS.clear()
+    _GEOD = None
+
+
 def transformer(src_crs, dst_crs):
-    return QgsCoordinateTransform(src_crs, dst_crs, _ctx())
+    key = (_crs_key(src_crs), _crs_key(dst_crs))
+    tr = _TRANSFORMS.get(key)
+    if tr is None:
+        if len(_TRANSFORMS) > 32:
+            _TRANSFORMS.clear()
+        tr = QgsCoordinateTransform(src_crs, dst_crs, _ctx())
+        _TRANSFORMS[key] = tr
+    return tr
+
+
+def _geod():
+    global _GEOD
+    if _GEOD is None:
+        da = QgsDistanceArea()
+        da.setSourceCrs(wgs84(), _ctx())
+        da.setEllipsoid(WGS84_ELLIPSOID)
+        _GEOD = da
+    return _GEOD
+
+
+def _circle_wgs84_direct(lon, lat, radius_m, segments):
+    """椭球面正解（测地线）逐点生成圆，返回 WGS84 多边形。
+
+    只用 QgsDistanceArea（C++），不需要为每个圆心新建一个自定义 aeqd CRS，
+    比「构造 aeqd + 两个 QgsCoordinateTransform」快得多。
+    """
+    da = _geod()
+    c = QgsPointXY(lon, lat)
+    pts = []
+    for i in range(segments):
+        p = da.computeSpheroidProject(c, radius_m, 2.0 * math.pi * i / segments)
+        pts.append(QgsPointXY(p.x(), p.y()))
+
+    # 自检：结果不对（API 行为差异 / 跨日界线 / 极区）就抛异常，让调用方回退到 aeqd 方案
+    lons = [p.x() for p in pts]
+    if max(lons) - min(lons) > 180.0:
+        raise ValueError("circle crosses antimeridian")
+    d = da.measureLine(c, pts[0])
+    if abs(d - radius_m) > max(0.5, radius_m * 1e-3):
+        raise ValueError("direct geodesic sanity check failed: {} vs {}".format(d, radius_m))
+
+    pts.append(QgsPointXY(pts[0]))
+    return QgsGeometry.fromPolygonXY([pts])
+
+
+def _circle_aeqd(lon, lat, radius_m, segments, tgt):
+    """回退方案：aeqd 投影里 buffer（原实现，慢但稳）。"""
+    aeqd = QgsCoordinateReferenceSystem.fromProj(_AEQD_PROJ.format(lat=float(lat), lon=float(lon)))
+    if not aeqd.isValid():
+        raise RuntimeError("无法构造方位等距投影（aeqd）")
+    to_aeqd = QgsCoordinateTransform(wgs84(), aeqd, _ctx())
+    to_target = QgsCoordinateTransform(aeqd, tgt, _ctx())
+    geom = QgsGeometry.fromPointXY(to_aeqd.transform(QgsPointXY(float(lon), float(lat))))
+    geom = geom.buffer(float(radius_m), int(segments))
+    geom.transform(to_target)
+    return geom
 
 
 def geodesic_circle(lon, lat, radius_m=DEFAULT_RADIUS_M, segments=DEFAULT_SEGMENTS, target_crs=None):
@@ -68,16 +143,14 @@ def geodesic_circle(lon, lat, radius_m=DEFAULT_RADIUS_M, segments=DEFAULT_SEGMEN
     :param target_crs: 目标坐标系，默认取工程 CRS
     """
     tgt = target_crs or project_crs()
-    aeqd = QgsCoordinateReferenceSystem.fromProj(_AEQD_PROJ.format(lat=float(lat), lon=float(lon)))
-    if not aeqd.isValid():
-        raise RuntimeError("无法构造方位等距投影（aeqd）")
+    lon, lat, radius_m, segments = float(lon), float(lat), float(radius_m), int(segments)
+    try:
+        geom = _circle_wgs84_direct(lon, lat, radius_m, segments)
+    except Exception:
+        return _circle_aeqd(lon, lat, radius_m, segments, tgt)
 
-    to_aeqd = transformer(wgs84(), aeqd)
-    to_target = transformer(aeqd, tgt)
-
-    geom = QgsGeometry.fromPointXY(to_aeqd.transform(QgsPointXY(float(lon), float(lat))))
-    geom = geom.buffer(float(radius_m), int(segments))
-    geom.transform(to_target)
+    if _crs_key(tgt) != WGS84_AUTHID:
+        geom.transform(transformer(wgs84(), tgt))
     return geom
 
 
@@ -111,9 +184,14 @@ def measurer(crs=None, ellipsoid=None):
     if not ell or ell.upper() == "NONE":
         ell = WGS84_ELLIPSOID
 
-    da = QgsDistanceArea()
-    da.setSourceCrs(crs or project_crs(), _ctx())
-    da.setEllipsoid(ell)
+    the_crs = crs or project_crs()
+    key = (_crs_key(the_crs), ell)
+    da = _MEASURERS.get(key)
+    if da is None:
+        da = QgsDistanceArea()
+        da.setSourceCrs(the_crs, _ctx())
+        da.setEllipsoid(ell)
+        _MEASURERS[key] = da
     return da
 
 

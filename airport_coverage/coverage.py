@@ -67,8 +67,11 @@ class CoverageLayer:
 
     @property
     def layer(self):
-        if self._layer is not None and self._layer.isValid():
-            return self._layer
+        try:
+            if self._layer is not None and self._layer.isValid():
+                return self._layer
+        except RuntimeError:  # 用户在图层面板里删掉了图层，C++ 对象已销毁
+            self._layer = None
         found = self.project.mapLayersByName(LAYER_NAME)
         self._layer = found[0] if found else None
         return self._layer
@@ -108,93 +111,101 @@ class CoverageLayer:
     def _idx(self, key):
         return self.layer.fields().indexOf(key)
 
-    def _ensure_editable(self):
-        if not self.layer.isEditable():
-            self.layer.startEditing()
+    def commit(self):
+        """兼容旧调用：如果用户手动把图层切到了编辑模式，这里提交掉。"""
+        lyr = self.layer
+        if lyr is not None and lyr.isEditable():
+            return lyr.commitChanges()
         return True
 
-    def commit(self):
-        if self.layer is not None and self.layer.isEditable():
-            return self.layer.commitChanges()
-        return True
+    def _provider(self):
+        """取 provider 用于直接读写。若图层处于编辑模式先提交，避免编辑缓冲区与 provider 不一致。"""
+        lyr = self.layer
+        if lyr is None:
+            return None
+        if lyr.isEditable():
+            lyr.commitChanges()
+        return lyr.dataProvider()
+
+    @staticmethod
+    def _after_change(lyr):
+        lyr.updateExtents()
+        lyr.triggerRepaint()
 
     # ---------- 增删改 ----------
+    # 为什么不用 startEditing/addFeature/commitChanges：
+    #   memory 图层每次进出编辑模式都会重建编辑缓冲区、写撤销栈、发一串信号，
+    #   原实现单次落圆会触发面板刷新 3 次；拖动时每次鼠标移动还会往撤销栈压 5 条命令。
+    #   直接操作 provider 一步到位，且 addFeatures 直接返回真实要素 id。
+
+    def _next_name(self, lyr):
+        used = {str(f.attribute("name")) for f in lyr.getFeatures()}
+        n = lyr.featureCount() + 1
+        while "机位{}".format(n) in used:
+            n += 1
+        return "机位{}".format(n)
 
     def add_circle(self, lon, lat, radius_m=DEFAULT_RADIUS_M, name=None):
         """在指定圆心加一个覆盖圆，返回要素 id。"""
         lyr = self.ensure_layer()
+        prov = self._provider()
+        self.last_error = None
+
         geom = geodesic_circle(lon, lat, radius_m, target_crs=lyr.crs())
         area = measure_area(geom, lyr.crs()) / 1e6
 
-        if name is None:
-            name = "机位{}".format(lyr.featureCount() + 1)
-
         feat = QgsFeature(lyr.fields())
         feat.setGeometry(geom)
-        feat.setAttributes([name, float(radius_m), float(lon), float(lat), float(area)])
+        feat.setAttributes([name or self._next_name(lyr), float(radius_m), float(lon), float(lat), float(area)])
 
-        # 注意两点：
-        # 1) QgsVectorLayer.addFeature(feat) 只返回 bool，拿不到 id；
-        # 2) 编辑缓冲区里拿到的是临时负 id（如 -2），提交后才会变成真实 id。
-        # 所以这里添加后立刻提交，用「提交前后的 id 差集」定位新要素。
-        before = {f.id() for f in lyr.getFeatures()}
-        self._ensure_editable()
-        ok = lyr.addFeature(feat)
-        committed = lyr.commitChanges()
-        lyr.triggerRepaint()
-
-        self.last_error = None
-        if not ok:
+        ok, added = prov.addFeatures([feat])
+        if not ok or not added:
             self.last_error = "图层拒绝了写入（可能是几何或字段不匹配）"
             return None
-        if not committed:
-            self.last_error = "图层 {} 提交失败：{}".format(LAYER_NAME, lyr.commitErrors() or "未知原因")
-            return None
-
-        new_ids = {f.id() for f in lyr.getFeatures()} - before
-        return sorted(new_ids)[-1] if new_ids else None
+        self._after_change(lyr)
+        return added[0].id()
 
     def update_circle(self, fid, lon, lat, radius_m):
-        """把圆挪到新圆心（半径不变）。拖动时调用。"""
+        """把圆挪到新圆心（半径不变）。"""
         lyr = self.layer
-        if lyr is None:
+        prov = self._provider()
+        if lyr is None or prov is None:
             return False
         geom = geodesic_circle(lon, lat, radius_m, target_crs=lyr.crs())
         area = measure_area(geom, lyr.crs()) / 1e6
 
-        self._ensure_editable()
-        lyr.changeGeometry(fid, geom)
-        lyr.changeAttributeValue(fid, self._idx("radius_m"), float(radius_m))
-        lyr.changeAttributeValue(fid, self._idx("lon"), float(lon))
-        lyr.changeAttributeValue(fid, self._idx("lat"), float(lat))
-        lyr.changeAttributeValue(fid, self._idx("area_km2"), float(area))
-        lyr.triggerRepaint()
+        prov.changeGeometryValues({fid: geom})
+        prov.changeAttributeValues(
+            {
+                fid: {
+                    self._idx("radius_m"): float(radius_m),
+                    self._idx("lon"): float(lon),
+                    self._idx("lat"): float(lat),
+                    self._idx("area_km2"): float(area),
+                }
+            }
+        )
+        self._after_change(lyr)
         return True
 
     def set_name(self, fid, name):
-        if self.layer is None:
-            return
-        self._ensure_editable()
-        self.layer.changeAttributeValue(fid, self._idx("name"), name)
+        prov = self._provider()
+        if prov is not None:
+            prov.changeAttributeValues({fid: {self._idx("name"): name}})
 
     def remove_features(self, fids):
         lyr = self.layer
-        if lyr is None or not fids:
+        prov = self._provider()
+        if lyr is None or prov is None or not fids:
             return 0
-        self._ensure_editable()
-        ok = lyr.deleteFeatures(list(fids))
-        lyr.triggerRepaint()
+        ok = prov.deleteFeatures(list(fids))
+        self._after_change(lyr)
         return len(fids) if ok else 0
 
     # ---------- 查询 ----------
 
     def feature_at(self, point_map_crs, map_crs, tol_px=12, canvas=None):
-        """找出点击位置下的圆。
-
-        :param point_map_crs: 画布坐标系下的点
-        :param map_crs: 画布坐标系
-        :param tol_px: 命中容差（像素）
-        """
+        """找出点击位置下的圆；多个圆重叠时取圆心离点击点最近的那个。"""
         lyr = self.layer
         if lyr is None:
             return None
@@ -203,17 +214,21 @@ class CoverageLayer:
         pt_layer = self._to_layer_crs(point_map_crs, map_crs, lyr.crs())
         click = QgsGeometry.fromPointXY(pt_layer)
 
-        best_fid, best_dist = None, None
+        inside = []  # (到圆心距离, fid)
+        near = None  # (到边界距离, fid)
         for feat in lyr.getFeatures():
             geom = feat.geometry()
             if geom is None or geom.isEmpty():
                 continue
-            if geom.contains(pt_layer):
-                return feat.id()
+            if geom.contains(click):
+                inside.append((geom.centroid().asPoint().distance(pt_layer), feat.id()))
+                continue
             d = geom.distance(click)
-            if d <= tol and (best_dist is None or d < best_dist):
-                best_fid, best_dist = feat.id(), d
-        return best_fid
+            if d <= tol and (near is None or d < near[0]):
+                near = (d, feat.id())
+        if inside:
+            return min(inside)[1]
+        return near[1] if near else None
 
     def _to_layer_crs(self, point, src_crs, dst_crs):
         if src_crs.authid() and src_crs.authid() == dst_crs.authid():
@@ -223,9 +238,12 @@ class CoverageLayer:
         return transformer(src_crs, dst_crs).transform(QgsPointXY(point))
 
     def _tolerance(self, layer_crs, map_crs, tol_px, canvas, origin):
-        """把像素容差换算成图层单位。"""
-        from .geodesy import measurer
+        """把像素容差换算成「图层 CRS 的单位」。
 
+        注意：geom.distance() 是平面距离，单位就是图层 CRS 的单位（4326 下是度）。
+        原实现用 QgsDistanceArea 返回「米」，在 4326 下 ≈ 几百~几千，
+        远大于任何以度为单位的距离，导致点地图任意位置都会命中最近的圆。
+        """
         try:
             if canvas is not None:
                 tr = canvas.getCoordinateTransform()
@@ -235,8 +253,7 @@ class CoverageLayer:
                 p1, p2 = origin, QgsPointXY(origin.x() + 1e-5, origin.y())
             a = self._to_layer_crs(p1, map_crs, layer_crs)
             b = self._to_layer_crs(p2, map_crs, layer_crs)
-            d = measurer(layer_crs).measureLine([a, b])
-            return max(d, 1e-9)
+            return max(a.distance(b), 1e-12)
         except Exception:
             return 1e-5
 
