@@ -1,0 +1,14 @@
+
+# 系统与编辑器
+.DS_Store
+Thumbs.db
+*.local
+.vscode/
+.idea/
+
+# Python
+__pycache__/
+*.py[cod]
+
+# 日志
+*.log

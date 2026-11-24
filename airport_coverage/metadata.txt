@@ -1,0 +1,18 @@
+[general]
+name=机场覆盖区规划
+version=0.1.0
+qgisMinimumVersion=3.22
+qgisMaximumVersion=4.99
+description=机场（大疆机场 / DJI Dock）覆盖区范围选择：5 km 覆盖圆、三种在线图源、线/面积测量
+about=用于机场覆盖区范围选择。大疆机场实测有效覆盖半径为 5 km，本插件以此为默认半径生成半透明覆盖圆，可复制、可随意拖动，直观判断每个机位的覆盖范围、相互重叠与盲区。内置 Esri World Imagery、GEOVIS Earth、四维地球三种在线影像图源（均为 WGS84），并提供线测量与面积测量。
+author=DGIS
+email=
+category=Vector
+icon=icon.svg
+experimental=False
+deprecated=False
+tracker=https://github.com/liyu253178/qgis-airport-coverage/issues
+repository=https://github.com/liyu253178/qgis-airport-coverage
+tags=机场,覆盖区,大疆机场,DJI Dock,无人机,测量,5km
+homepage=https://github.com/liyu253178/qgis-airport-coverage
+hasProcessingProvider=no
