@@ -3,11 +3,16 @@ name=机场覆盖区规划
 version=0.1.6
 qgisMinimumVersion=3.22
 qgisMaximumVersion=4.99
-description=机场（大疆机场 / DJI Dock）覆盖区范围选择：5 km 覆盖圆、多种在线图源、线/面积测量
+description=Airport (DJI Dock) coverage zone planning: 5 km coverage circles, online basemaps, China admin boundaries, line/area measurement, GeoPackage export.
 about=机场（大疆机场 / DJI Dock）覆盖区范围选择工具：以 5 km 默认半径生成覆盖圆，可添加、拖动、重算，直观判断机位的覆盖范围、重叠与盲区；内置 Esri、谷歌、星图地球、四维地球、吉林一号、天地图（含注记叠加层，需自备 key）等在线影像图源，内置中国省 / 市 / 县行政区划，可按省、市按需加载；并提供线测量、面积测量与 GeoPackage 导出。本插件由微信公众号【点点 GIS】开发，欢迎关注交流。联系邮箱：zheyuchen6@gmail.com
+
+English: Coverage zone planning for airports / DJI Dock. Generates 5 km geodesic coverage circles (theoretical limit; 4–5 km recommended for initial siting), draggable and recalculable, with live statistics on overlap and blind zones. Six online basemaps (Esri, Google, GEOVIS, Siwei, Jilin-1, Tianditu with user-supplied key), built-in China province/city/county boundaries loaded on demand, line & area measurement, GeoPackage export.
+
+Requirements / restrictions: QGIS >= 3.22, pure Python + Qt (PyQGIS), no third-party Python dependencies. Online basemaps and administrative boundaries require internet access; Tianditu requires the user to supply their own API key in the plugin panel.
 author=点点 GIS
 email=zheyuchen6@gmail.com
 category=Vector
+license=GPL-2.0-or-later
 icon=icon.svg
 experimental=False
 deprecated=False

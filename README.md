@@ -111,3 +111,8 @@ airport_coverage/
 
 - 问题反馈：仓库 Issues，或联系邮箱 zheyuchen6@gmail.com
 - 作者：点点 GIS（微信公众号）
+
+## 许可证
+
+本项目以 **GPL-2.0-or-later** 许可证发布（见仓库根 `LICENSE`），
+与 QGIS 插件官方商店（plugins.qgis.org）的要求兼容。
