@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>机场覆盖区规划 —— QGIS 插件介绍</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #f2f3f5; font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; }
+  .page { max-width: 900px; margin: 0 auto; background: #fff; padding: 48px 56px 64px; }
+  h1 { font-size: 30px; line-height: 1.4; color: #1a1a1a; margin: 0 0 18px; font-weight: 700; }
+  .sub { color: #888; font-size: 14px; margin-bottom: 36px; }
+  h2 { font-size: 22px; color: #111; margin: 44px 0 16px; padding-left: 12px; border-left: 5px solid #2563EB; font-weight: 700; }
+  p { font-size: 17px; line-height: 1.85; color: #2d2d2d; margin: 0 0 18px; }
+  .lead { font-size: 17px; color: #333; }
+  .lead strong { color: #1d4ed8; }
+  img { width: 100%; display: block; border-radius: 8px; margin: 10px 0 22px; border: 1px solid #e6e6e6; }
+  .cap { font-size: 13px; color: #999; text-align: center; margin: -14px 0 24px; }
+  .callout { background: #eef4ff; border-left: 4px solid #2563EB; padding: 14px 18px; border-radius: 0 8px 8px 0; margin: 0 0 20px; font-size: 15px; line-height: 1.8; color: #1e3a8a; }
+  .callout b { color: #1d4ed8; }
+  .kpi { display: flex; gap: 12px; margin: 0 0 22px; }
+  .kpi div { flex: 1; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 16px 12px; text-align: center; }
+  .kpi .n { font-size: 26px; font-weight: 800; color: #2563EB; }
+  .kpi .t { font-size: 13px; color: #666; margin-top: 6px; }
+  .tag { display: inline-block; background: #eef2ff; color: #4338ca; font-size: 13px; padding: 3px 10px; border-radius: 999px; margin-right: 8px; }
+  .footer { margin-top: 48px; padding-top: 24px; border-top: 1px solid #eee; color: #888; font-size: 14px; line-height: 1.9; }
+  .footer a { color: #2563EB; text-decoration: none; word-break: break-all; }
+  ol, ul { font-size: 16px; line-height: 1.9; color: #2d2d2d; padding-left: 22px; }
+  li { margin-bottom: 8px; }
+  code { background: #f4f4f5; padding: 2px 6px; border-radius: 4px; font-size: 14px; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <h1>大疆机场选址，QGIS 插件「机场覆盖区规划」怎么用</h1>
+  <div class="sub">机场覆盖区规划 v0.1.6 · QGIS 3.22+ · 点点 GIS</div>
+
+  <p class="lead">大疆机场（DJI Dock）的覆盖半径，<strong>综合考虑续航、航程、任务时间等因素，理论上限是 5 公里</strong>；实际选址初筛建议控制在 <strong>4–5 km</strong>。选址时除了「这一个圆」，还要看它与邻近机位<strong>是否重叠</strong>、中间<strong>是否有覆盖盲区</strong>。这个 QGIS 插件可以帮我们把覆盖圆画出来并做这些分析。它跑在 <strong>QGIS</strong> 平台上，客户发来的 TIF、JPG、SHP、KML 等数据都能直接叠加进来。</p>
+
+  <div class="kpi">
+    <div><div class="n">5 km</div><div class="t">理论上限（续航测算）</div></div>
+    <div><div class="n">4–5 km</div><div class="t">推荐初筛半径</div></div>
+    <div><div class="n">6 类</div><div class="t">在线图源</div></div>
+    <div><div class="n">2890</div><div class="t">内置县级区划</div></div>
+  </div>
+
+  <div class="callout">
+    <b>半径怎么定：</b>建议<strong>以大疆机场为圆心、按 4–5 km 作为推荐覆盖半径做选址初筛</strong>，5 km 可作为理论上限参考。
+    实际落地更建议控制在 4–5 km——给无人机<strong>往返航程、任务作业时间、安全电量余量</strong>和<strong>复杂环境</strong>留出余量。
+    最终点位还要结合<strong>地形遮挡、信号环境、航线高度和实际任务频次</strong>复核，不能只按直线距离判断。
+  </div>
+
+  <h2>01 · 点一下，就是一个 5 公里覆盖圆</h2>
+  <p>点「添加机位」，在地图上点一下，一个半透明的覆盖圆就出现了。插件默认给 5 km（理论参考上限），可按项目情况改成 4–5 km 做初筛。半径在面板里随时可改，改完点「重算所选」，选中的圆按新半径重建。圆与圆之间的重叠关系可以直接看到。</p>
+  <img src="screenshots/01_主界面_5km覆盖圆.jpg" alt="主界面：三个覆盖圆">
+  <div class="cap">覆盖圆（默认 5 km，可改为 4–5 km 初筛），右侧面板实时统计</div>
+
+  <h2>02 · 六类在线图源，天地图还能叠注记</h2>
+  <p>底图内置了 <span class="tag">Esri 影像</span><span class="tag">谷歌卫星</span><span class="tag">星图地球</span><span class="tag">四维地球</span><span class="tag">吉林一号</span><span class="tag">天地图</span>。全部为 WGS84，直接叠在覆盖圆下不会错位。</p>
+  <p>天地图还做了个细节：影像底图和注记是分开的两层，你可以把路名、地名单独叠上去，底下影像完全不动。天地图需要你在面板里填自己的 key（浏览器端免费申请），插件会把 key 存在本机，跨工程、跨重启都有效。</p>
+  <img src="screenshots/02_底图切换_星图地球.jpg" alt="底图切换为星图地球">
+  <div class="cap">切到星图地球 GEOVIS 影像，底图即时换</div>
+
+  <h2>03 · 内置省市县边界，按视窗自动加载</h2>
+  <p>选址总得看边界。插件内置中国省、市、县三级行政区划——34 个省、375 个地级、2890 个县级。不用自己找数据，它会按你当前视窗只加载看得见的部分，图层轻量，画布不卡。</p>
+  <img src="screenshots/03_行政区划_深圳市界.jpg" alt="深圳市界加载">
+  <div class="cap">深圳市界（橙色半透明）加载，覆盖圆落在市域内</div>
+
+  <h2>04 · 借助 QGIS 平台，客户发来的数据直接叠上来</h2>
+  <p>这个插件基于 <strong>QGIS</strong> 平台的通用能力——<strong>客户发来的常见格式可以直接拖进工程</strong>，与覆盖圆叠加做对比：</p>
+  <ul>
+    <li><span class="tag">TIF / TIFF</span><span class="tag">JPG / PNG</span> 客户给的航拍影像、卫片、正射图，直接当底图或半透明叠在下面</li>
+    <li><span class="tag">SHP</span><span class="tag">GeoJSON</span><span class="tag">GPKG</span> 客户给的边界、地块、管线，直接叠上来做取舍参考</li>
+    <li><span class="tag">KML / KMZ</span> 客户在谷歌地球里画的机位、范围，直接导入，不用重画</li>
+    <li><span class="tag">CSV / 表格</span> 带经纬度的点位表，一键成点</li>
+  </ul>
+  <p>下面是客户发来的<strong>KML 边界和机位点</strong>直接叠加的效果——红线是客户给的乡镇边界，红点是客户给的备选机位，蓝色覆盖圆按 4.5 km 套上，可据此判断各机位覆盖范围与边界的关系。</p>
+  <img src="screenshots/07_导入客户数据_KML.jpg" alt="导入客户 KML 数据">
+  <div class="cap">客户 KML 边界 + 机位点直接导入，4.5 km 覆盖圆套上做对比（净覆盖 176.78 km²，重叠 7.3%）</div>
+
+  <h2>05 · 统计一行字，看清重叠和盲区</h2>
+  <p>调整机位时，面板里这行统计会实时更新：<b>机位数量、净覆盖面积、重叠面积、重叠占比</b>。重叠占比偏高说明机位偏密；中间留有大空档则说明有覆盖盲区。这些数值可作为选址判断的参考。</p>
+  <img src="screenshots/04_统计_重叠分析.jpg" alt="统计重叠">
+  <div class="cap">机位 3 个 | 净覆盖 159.65 km² | 重叠 75.67 km²（32.2%）</div>
+
+  <h2>06 · 拖动、测量、导出</h2>
+  <p>机位选得不合适？按住直接拖。拖动过程中看到的是<strong>橙色预览圈</strong>，不会乱改数据；松手才真正落位，中途改主意按 Esc 取消。</p>
+  <img src="screenshots/06_拖动_橙色预览.jpg" alt="拖动预览">
+  <div class="cap">拖动中的橙色预览圈</div>
+  <p>顺手还带了<strong>线测量</strong>和<strong>面积测量</strong>，量条边、量块地都行。方案定稿后点「导出机位方案」存成 GeoPackage。</p>
+  <img src="screenshots/05_线面积测量.jpg" alt="线面积测量">
+  <div class="cap">红色为线测量，蓝色为面积测量</div>
+
+  <h2>07 · 为什么这个圆是「对」的，以及半径别拍脑袋</h2>
+  <div class="callout"><b>这里有个容易踩的坑。</b>普通软件画圆，是把经纬度当平面缓冲出来的——那样画出来的「5 公里圆」，在北京、漠河这种纬度上误差能到 <b>1 公里以上</b>。这个插件的圆按<strong>椭球测地线</strong>计算，半径是真实地面距离，在不同纬度下量出来都是 5 公里。拖动同理：不是平移几何，而是按新圆心重建。</div>
+  <p><b>半径也别拍脑袋。</b>插件默认给 5 km，这是大疆机场的<strong>理论上限</strong>；初筛建议用 <strong>4–5 km</strong>——留出往返航程、作业时间、安全电量和复杂环境的余量。画出来的圆只是<strong>直线距离的初筛</strong>，最终点位还要叠加<strong>地形遮挡、信号环境、航线高度、任务频次</strong>复核。</p>
+
+  <h2>08 · 获取方式</h2>
+  <ul>
+    <li>安装：下载 <code>airport_coverage-0.1.6.zip</code>，QGIS 菜单 <code>插件 → 管理并安装插件 → 从 ZIP 安装</code>，勾选启用。要求 QGIS 3.22 以上。</li>
+    <li>源码与安装包：<a href="https://github.com/liyu253178/qgis-airport-coverage">github.com/liyu253178/qgis-airport-coverage</a></li>
+    <li>问题反馈：仓库 Issues，或联系邮箱 zheyuchen6@gmail.com</li>
+  </ul>
+
+  <div class="footer">
+    <p>机场覆盖区规划 · QGIS 插件 v0.1.6 · 点点 GIS 出品</p>
+    <p>覆盖圆、重叠、盲区、边界、测量、导出，在插件里都可以完成。</p>
+  </div>
+
+</div>
+</body>
+</html>
