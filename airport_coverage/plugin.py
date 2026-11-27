@@ -13,6 +13,7 @@ from .admin import add_admin_layer, extent_in_canvas_crs
 from .basemaps import add_basemap, apply_key_to_loaded_layers, get_basemap, set_tianditu_key
 from .coverage import CoverageLayer, crs_warning
 from .dock import CoverageDock
+from .export_dialog import FigureDialog
 from .geodesy import clear_cache, ensure_project_crs
 from .icons import icon
 from .tool_add_circle import AddCircleTool
@@ -47,6 +48,7 @@ class AirportCoveragePlugin:
         self.dock.basemapRequested.connect(self.load_basemap)
         self.dock.tiandituKeyChanged.connect(self.save_tianditu_key)
         self.dock.adminRequested.connect(self.load_admin)
+        self.dock.figureRequested.connect(self.open_figure_dialog)
         self.iface.addDockWidget(Qt.RightDockWidgetArea, self.dock)
 
         self.toolbar = self.iface.addToolBar(PLUGIN_TITLE)
@@ -71,6 +73,8 @@ class AirportCoveragePlugin:
         self._add_action("line", "线测量", "测量折线长度", lambda: self.set_tool("line"), "line", tool=True)
         self._add_action("area", "面积测量", "测量围成区域的面积与周长", lambda: self.set_tool("area"), "area", tool=True)
         self.toolbar.addSeparator()
+        self._add_action("figure", "制图输出", "导出期刊风格成果图（含区位插图、比例尺、图例、统计表）",
+                         lambda: self.open_figure_dialog(), "figure")
         self._add_action("export", "导出机位方案", "导出为 GeoPackage（memory 图层关闭即丢失）", lambda: self.dock._export(), "export")
 
         for act in self.actions:
@@ -210,6 +214,15 @@ class AirportCoveragePlugin:
             self._message("已加载：{}".format(basemap["name"]))
         if self.dock is not None:
             self.dock.refresh_later()
+
+    # ---------- 制图输出 ----------
+
+    def open_figure_dialog(self):
+        if self.coverage.layer is None or self.coverage.layer.featureCount() == 0:
+            self._message("还没有机位覆盖圆：请先用「添加机位」落几个圆，再制图输出", 1)
+            return
+        dlg = FigureDialog(self.iface, self.coverage)
+        dlg.exec_()
 
     # ---------- 行政区划 ----------
 

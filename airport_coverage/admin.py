@@ -46,6 +46,8 @@ _LEVEL = {k: i for i, (k, *_rest) in enumerate(LEVELS)}
 _LABEL_IDX = {lv[1]: i for i, lv in enumerate(LEVELS)}
 
 _REGIONS = None
+_CITY_GBS = None
+BOUNDARY_LINES = os.path.join(DATA_DIR, "boundary_lines.geojson")
 
 
 def regions():
@@ -206,3 +208,56 @@ def extent_in_canvas_crs(layer, canvas):
     if layer.crs() != dst:
         ext = QgsCoordinateTransform(layer.crs(), dst, QgsProject.instance().transformContext()).transformBoundingBox(ext)
     return ext
+
+
+# ---------- 层级关系（出图的区位插图用） ----------
+
+def data_path(level_key):
+    return os.path.join(DATA_DIR, LEVELS[_LEVEL[level_key]][2])
+
+
+def level_of_layer_name(name):
+    """「行政区划｜县（区）｜…」 -> 'county'；不是本插件的行政区划图层返回 None。"""
+    if not name.startswith(PREFIX):
+        return None
+    idx = _LABEL_IDX.get(name[len(PREFIX):].split("｜")[0])
+    return None if idx is None else LEVELS[idx][0]
+
+
+def _city_gbs():
+    global _CITY_GBS
+    if _CITY_GBS is None:
+        _CITY_GBS = {c["gb"] for lst in regions()["cities"].values() for c in lst}
+    return _CITY_GBS
+
+
+def parent_of(level_key, gb):
+    """上一级行政区。返回 (上级层级key, 上级gb)；已是最高（上一级是全国）返回 (None, None)。
+
+    直辖市：区县的上一级是该直辖市本身；省直辖县（如琼海、济源）：上一级是省。
+    """
+    code = gb[3:]
+    prov_gb = "156" + code[:2] + "0000"
+    if level_key == "province":
+        return None, None
+    if level_key == "city":
+        return (None, None) if prov_gb == gb else ("province", prov_gb)
+    cities = _city_gbs()
+    if gb in cities:                      # 省直辖县级单位（市表里也有，代码就是自己）
+        return "province", prov_gb
+    city4 = "156" + code[:4] + "00"
+    if city4 in cities and city4 != gb:
+        return "city", city4
+    if prov_gb in cities:                 # 直辖市 / 港澳台
+        return "city", prov_gb
+    return "province", prov_gb
+
+
+def finest_level(level_keys):
+    """从若干层级里取最细的（县 > 市 > 省）。"""
+    keys = [k for k in level_keys if k in _LEVEL]
+    return max(keys, key=lambda k: _LEVEL[k]) if keys else None
+
+
+def level_label(level_key):
+    return LEVELS[_LEVEL[level_key]][1]

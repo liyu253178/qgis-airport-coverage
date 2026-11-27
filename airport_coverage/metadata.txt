@@ -1,14 +1,15 @@
 [general]
 name=机场覆盖区规划
-version=0.1.6
+version=0.2.0
 qgisMinimumVersion=3.22
 qgisMaximumVersion=4.99
-description=Airport (DJI Dock) coverage zone planning: 5 km coverage circles, online basemaps, China admin boundaries, line/area measurement, GeoPackage export.
-about=机场（大疆机场 / DJI Dock）覆盖区范围选择工具：以 5 km 默认半径生成覆盖圆，可添加、拖动、重算，直观判断机位的覆盖范围、重叠与盲区；内置 Esri、谷歌、星图地球、四维地球、吉林一号、天地图（含注记叠加层，需自备 key）等在线影像图源，内置中国省 / 市 / 县行政区划，可按省、市按需加载；并提供线测量、面积测量与 GeoPackage 导出。本插件由微信公众号【点点 GIS】开发，欢迎关注交流。联系邮箱：zheyuchen6@gmail.com
+description=Airport (DJI Dock) coverage zone planning: 5 km coverage circles, online basemaps, China admin boundaries, line/area measurement, journal-style figure export.
+about=机场（大疆机场 / DJI Dock）覆盖区范围选择工具：以 5 km 默认半径生成覆盖圆，可添加、拖动、重算，直观判断机位的覆盖范围、重叠与盲区；内置 Esri、谷歌、星图地球、四维地球、吉林一号、天地图（含注记叠加层，需自备 key）等在线影像图源，内置中国省 / 市 / 县行政区划，可按省、市按需加载；并提供线测量、面积测量、GeoPackage 导出，以及一键导出期刊风格成果图（PDF/PNG/SVG/TIFF，含区位插图、比例尺、图例、分区统计表与经纬网）。本插件由微信公众号【点点 GIS】开发，欢迎关注交流。联系邮箱：zheyuchen6@gmail.com
 
-English: Coverage zone planning for airports / DJI Dock. Generates 5 km geodesic coverage circles (theoretical limit; 4–5 km recommended for initial siting), draggable and recalculable, with live statistics on overlap and blind zones. Six online basemaps (Esri, Google, GEOVIS, Siwei, Jilin-1, Tianditu with user-supplied key), built-in China province/city/county boundaries loaded on demand, line & area measurement, GeoPackage export.
+English: Coverage zone planning for airports / DJI Dock. Generates 5 km geodesic coverage circles (theoretical limit; 4–5 km recommended for initial siting), draggable and recalculable, with live statistics on overlap and blind zones. Six online basemaps (Esri, Google, GEOVIS, Siwei, Jilin-1, Tianditu with user-supplied key), built-in China province/city/county boundaries loaded on demand, line & area measurement, GeoPackage export, and one-click journal-style figure export (PDF/PNG/SVG/TIFF with locator inset, scale bar, legend, zonal statistics and graticule).
 
 Requirements / restrictions: QGIS >= 3.22, pure Python + Qt (PyQGIS), no third-party Python dependencies. Online basemaps and administrative boundaries require internet access; Tianditu requires the user to supply their own API key in the plugin panel.
+
 author=点点 GIS
 email=zheyuchen6@gmail.com
 category=Vector
@@ -18,7 +19,7 @@ experimental=False
 deprecated=False
 tracker=https://github.com/liyu253178/qgis-airport-coverage/issues
 repository=https://github.com/liyu253178/qgis-airport-coverage
-tags=机场,覆盖区,大疆机场,DJI Dock,无人机,测量,5km,行政区划,省市县
+tags=机场,覆盖区,大疆机场,DJI Dock,无人机,测量,5km,行政区划,省市县,制图输出,期刊图
 homepage=https://github.com/liyu253178/qgis-airport-coverage
 hasProcessingProvider=no
-changelog=0.1.6 内置中国省市县行政区划（按需加载）；0.1.5 补充插件介绍；0.1.4 天地图 key 设置
+changelog=0.2.0 新增「制图输出」：一键导出期刊风格成果图（区位插图/比例尺/图例/分区统计表/经纬网，PDF/PNG/SVG/TIFF），并修复制图输出的 3 处崩溃（对话框打开即崩、单栏式经纬网枚举改名、图例超长被裁）与 5 处排版优化；0.1.6 内置中国省市县行政区划（按需加载）；0.1.5 补充插件介绍；0.1.4 天地图 key 设置
